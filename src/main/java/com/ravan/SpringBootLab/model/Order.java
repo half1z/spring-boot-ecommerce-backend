@@ -34,6 +34,8 @@ public class Order {
 
     private LocalDateTime updatedAt;
 
+    private LocalDateTime reservationExpiresAt;
+
     public Order() {
     }
 
@@ -69,6 +71,10 @@ public class Order {
         return updatedAt;
     }
 
+    public LocalDateTime getReservationExpiresAt() {
+        return reservationExpiresAt;
+    }
+
     public void setId(Integer id) {
         this.id = id;
     }
@@ -91,5 +97,9 @@ public class Order {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public void setReservationExpiresAt(LocalDateTime reservationExpiresAt) {
+        this.reservationExpiresAt = reservationExpiresAt;
     }
 }

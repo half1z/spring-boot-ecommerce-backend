@@ -1,11 +1,12 @@
 package com.ravan.SpringBootLab.service;
 
 import com.ravan.SpringBootLab.config.KafkaTopicConfig;
-import com.ravan.SpringBootLab.event.OrderCreatedEvent;
 import com.ravan.SpringBootLab.dto.OrderItemResponse;
 import com.ravan.SpringBootLab.dto.OrderResponse;
+import com.ravan.SpringBootLab.event.OrderCreatedEvent;
 import com.ravan.SpringBootLab.exception.EmptyCartException;
 import com.ravan.SpringBootLab.exception.InsufficientStockException;
+import com.ravan.SpringBootLab.exception.InvalidOrderStatusException;
 import com.ravan.SpringBootLab.exception.OrderNotFoundException;
 import com.ravan.SpringBootLab.exception.UserNotFoundException;
 import com.ravan.SpringBootLab.model.CartItem;
@@ -19,9 +20,7 @@ import com.ravan.SpringBootLab.repository.OrderItemRepository;
 import com.ravan.SpringBootLab.repository.OrderRepository;
 import com.ravan.SpringBootLab.repository.ProductRepository;
 import com.ravan.SpringBootLab.repository.UserRepository;
-
-import com.ravan.SpringBootLab.exception.InvalidOrderStatusException;
-
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +39,7 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final OutboxEventService outboxEventService;
     private final OrderProcessingDelay orderProcessingDelay;
+    private final long reservationDurationMinutes;
 
     public OrderService(
             OrderRepository orderRepository,
@@ -48,7 +48,9 @@ public class OrderService {
             UserRepository userRepository,
             ProductRepository productRepository,
             OutboxEventService outboxEventService,
-            OrderProcessingDelay orderProcessingDelay
+            OrderProcessingDelay orderProcessingDelay,
+            @Value("${order.reservation.duration-minutes:15}")
+            long reservationDurationMinutes
     ) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
@@ -57,6 +59,7 @@ public class OrderService {
         this.productRepository = productRepository;
         this.outboxEventService = outboxEventService;
         this.orderProcessingDelay = orderProcessingDelay;
+        this.reservationDurationMinutes = Math.max(1, reservationDurationMinutes);
     }
 
     @Transactional
@@ -91,6 +94,11 @@ public class OrderService {
         orderProcessingDelay.delay();
 
         Order order = new Order(user, totalAmount, OrderStatus.PENDING);
+
+        order.setReservationExpiresAt(
+                LocalDateTime.now().plusMinutes(reservationDurationMinutes)
+        );
+
         Order savedOrder = orderRepository.save(order);
 
         for (CartItem cartItem : cartItems) {
@@ -154,29 +162,31 @@ public class OrderService {
     public OrderResponse cancelOrder(Integer orderId) {
         Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
-        
+
         if (order.getStatus() != OrderStatus.PENDING) {
-                throw new InvalidOrderStatusException(
-                        "Only PENDING orders can be cancelled. Current status: " + order.getStatus()
-                );
+            throw new InvalidOrderStatusException(
+                    "Only PENDING orders can be cancelled. Current status: "
+                            + order.getStatus()
+            );
         }
-        
+
         List<OrderItem> orderItems = orderItemRepository.findByOrder(order);
-        
+
         for (OrderItem orderItem : orderItems) {
-                Product product = orderItem.getProduct();
-                
-                product.setStock(product.getStock() + orderItem.getQuantity());
-                product.setUpdatedAt(LocalDateTime.now());
-                
-                productRepository.save(product);
+            Product product = orderItem.getProduct();
+
+            product.setStock(product.getStock() + orderItem.getQuantity());
+            product.setUpdatedAt(LocalDateTime.now());
+
+            productRepository.save(product);
         }
-        
+
         order.setStatus(OrderStatus.CANCELLED);
+        order.setReservationExpiresAt(null);
         order.setUpdatedAt(LocalDateTime.now());
-        
+
         Order savedOrder = orderRepository.save(order);
-        
+
         return toOrderResponse(savedOrder);
     }
 

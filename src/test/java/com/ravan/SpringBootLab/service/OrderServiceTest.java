@@ -74,7 +74,9 @@ class OrderServiceTest {
                 userRepository,
                 productRepository,
                 outboxEventService,
-                orderProcessingDelay
+                orderProcessingDelay,
+                15
+
         );
 
         user = new User("Ravan", "ravan@example.com", "backend", "hash", "USER");
