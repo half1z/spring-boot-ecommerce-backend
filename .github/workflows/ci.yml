@@ -20,8 +20,8 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_DB: spring_boot_lab
-          POSTGRES_USER: ravan
-          POSTGRES_PASSWORD: password
+          POSTGRES_USER: springboot
+          POSTGRES_PASSWORD: springboot_ci_password
         ports:
           - 5433:5432
         options: >-
@@ -53,8 +53,8 @@ jobs:
         run: ./mvnw --batch-mode --no-transfer-progress clean verify
         env:
           DB_URL: jdbc:postgresql://localhost:5433/spring_boot_lab
-          DB_USERNAME: ravan
-          DB_PASSWORD: password
+          DB_USERNAME: springboot
+          DB_PASSWORD: springboot_ci_password
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           KAFKA_BOOTSTRAP_SERVERS: localhost:9092
